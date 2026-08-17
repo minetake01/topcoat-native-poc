@@ -66,5 +66,5 @@ pub struct EventTarget {
 
 pub mod prelude {
     pub use crate::{Event, Signal, view};
-    pub use windows_reactor::{App, Element, RenderCx, Result};
+    pub use windows_reactor::{App, Backdrop, Element, RenderCx, Result};
 }

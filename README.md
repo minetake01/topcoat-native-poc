@@ -8,6 +8,7 @@ Topcoat の `view!` 記法を維持しつつ、DOM の代わりに本物の WinU
 - `signal`、Rust 式、`if`、`for`、`let` をそのまま Rust のリアクティブ描画へ lowering する
 - HTML 風の要素を WinUI 3 の `StackPanel`、`TextBlock`、`TextBox`、`Button` に変換する
 - `@click` と `@input` をネイティブイベントへ接続し、signal 更新時に UI を再調停する
+- WinUI 3 の `MicaBackdrop` をウィンドウ背景へ適用する
 - 未対応の DOM/CSS 機能は黙って近似せず、コンパイル時にエラーにする
 
 動作例は [`app/src/main.rs`](app/src/main.rs) です。UI のソースは次のように Topcoat の形を保っています。
@@ -78,6 +79,8 @@ Topcoat の合意形成で得られた表面言語を fork して再発明せず
 ```powershell
 cargo run -p topcoat-native-demo
 ```
+
+ウィンドウ背景には `Backdrop::Mica` を指定しています。Mica を隠さないよう、Topcoat から生成するルートパネルには不透明な背景を設定していません。Windows 11 では壁紙色を取り込んだ Windows 設定に近い外観になり、OS の視覚効果・アクセシビリティ方針に応じた表示制御は WinUI 3 が担当します。
 
 確認済みの操作:
 

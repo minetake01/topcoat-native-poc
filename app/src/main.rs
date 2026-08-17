@@ -49,6 +49,7 @@ fn app(cx: &mut RenderCx) -> Element {
 fn main() -> Result<()> {
     App::new()
         .title("Topcoat Native PoC")
+        .backdrop(Backdrop::Mica)
         .inner_size(720.0, 480.0)
         .render(app)
 }
