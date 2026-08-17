@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "app",
+    "crates/topcoat-native",
+    "crates/topcoat-native-macro",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.95"
+
+[workspace.dependencies]
+proc-macro2 = "1.0.106"
+quote = "1.0.45"
+syn = { version = "2.0.117", features = ["full"] }
+topcoat-native = { path = "crates/topcoat-native" }
+topcoat-native-macro = { path = "crates/topcoat-native-macro" }
+windows-reactor = { git = "https://github.com/microsoft/windows-rs.git", rev = "845e42a4328ec5b54b97f965798589d997cad177", package = "windows-reactor" }
+windows-reactor-setup = { git = "https://github.com/microsoft/windows-rs.git", rev = "845e42a4328ec5b54b97f965798589d997cad177", package = "windows-reactor-setup" }
+
+[profile.release]
+panic = "abort"

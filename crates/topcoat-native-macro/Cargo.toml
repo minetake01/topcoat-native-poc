@@ -1,0 +1,19 @@
+[package]
+name = "topcoat-native-macro"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+# Pin the exact Topcoat grammar revision used by this experiment. The UI
+# syntax is parsed by Topcoat's own parser rather than a look-alike grammar.
+topcoat-view-grammar = { git = "https://github.com/tokio-rs/topcoat.git", rev = "a2bd596af2a149f38fcf49570481f356a6cb1069", package = "topcoat-view-grammar" }
