@@ -92,7 +92,7 @@ pub fn native_table(
             .vertical_alignment(VerticalAlignment::Stretch)
             .grid_column(column)
             .on_click(move || on_sort.invoke(key.to_owned()))
-            .automation_name(format!("{label}で並べ替え"))
+            .automation_name(format!("Sort by {label}"))
             .into()
     }
 
@@ -104,10 +104,10 @@ pub fn native_table(
     ];
 
     let header = grid([
-        header_cell("名前", "name", 0, on_sort.clone()),
-        header_cell("更新日時", "modified", 1, on_sort.clone()),
-        header_cell("種類", "kind", 2, on_sort.clone()),
-        header_cell("サイズ", "size", 3, on_sort),
+        header_cell("Name", "name", 0, on_sort.clone()),
+        header_cell("Date modified", "modified", 1, on_sort.clone()),
+        header_cell("Type", "kind", 2, on_sort.clone()),
+        header_cell("Size", "size", 3, on_sort),
     ])
     .columns(columns)
     .height(36.0)
@@ -196,7 +196,7 @@ pub fn native_table(
     ])
     .width(width.max(480.0))
     .height(height.max(216.0))
-    .automation_name("ファイル一覧")
+    .automation_name("File list")
     .into()
 }
 

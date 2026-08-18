@@ -75,7 +75,7 @@ impl ExplorerState {
             selected_key: String::new(),
             sort: SortColumn::Name,
             ascending: true,
-            notice: "読み取り専用モード".to_owned(),
+            notice: "Read-only mode".to_owned(),
         }
     }
 
@@ -95,7 +95,7 @@ impl ExplorerState {
     }
 
     pub fn search_placeholder(&self) -> String {
-        format!("{}の検索", self.title())
+        format!("Search {}", self.title())
     }
 
     pub fn query(&self) -> String {
@@ -149,10 +149,10 @@ impl ExplorerState {
         let mut locations = Vec::new();
         if let Some(profile) = std::env::var_os("USERPROFILE").map(PathBuf::from) {
             for (label, child) in [
-                ("🏠 ホーム", None),
-                ("🖼 ピクチャ", Some("Pictures")),
-                ("📄 ドキュメント", Some("Documents")),
-                ("⬇ ダウンロード", Some("Downloads")),
+                ("🏠 Home", None),
+                ("🖼 Pictures", Some("Pictures")),
+                ("📄 Documents", Some("Documents")),
+                ("⬇ Downloads", Some("Downloads")),
             ] {
                 let path = child.map_or_else(|| profile.clone(), |child| profile.join(child));
                 if path.is_dir() {
@@ -213,9 +213,9 @@ impl ExplorerState {
         let selection = if self.selected_key.is_empty() {
             String::new()
         } else {
-            "  |  1 個の項目を選択".to_owned()
+            "  |  1 item selected".to_owned()
         };
-        format!("{visible} 個の項目{selection}  |  {}", self.notice)
+        format!("{visible} items{selection}  |  {}", self.notice)
     }
 
     pub fn with_query(mut self, query: String) -> Self {
@@ -224,7 +224,7 @@ impl ExplorerState {
         }
         self.query = query;
         self.selected_key.clear();
-        self.notice = "検索結果を表示中".to_owned();
+        self.notice = "Showing search results".to_owned();
         self
     }
 
@@ -237,7 +237,7 @@ impl ExplorerState {
             return self;
         }
         self.selected_key = key;
-        self.notice = "項目を選択しました".to_owned();
+        self.notice = "Item selected".to_owned();
         self
     }
 
@@ -274,7 +274,7 @@ impl ExplorerState {
             Ok(entries) => {
                 self.entries = entries;
                 self.selected_key.clear();
-                self.notice = "最新の情報に更新しました".to_owned();
+                self.notice = "Refreshed".to_owned();
             }
             Err(error) => self.notice = error,
         }
@@ -296,9 +296,9 @@ impl ExplorerState {
             self.ascending = true;
         }
         self.notice = if self.ascending {
-            "昇順で並べ替えました"
+            "Sorted ascending"
         } else {
-            "降順で並べ替えました"
+            "Sorted descending"
         }
         .to_owned();
         self
@@ -310,11 +310,11 @@ impl ExplorerState {
             self.change_directory(path, true);
         } else if path.is_file() {
             self.notice = match open_with_shell(&path) {
-                Ok(()) => format!("{} を開きました", path.display()),
+                Ok(()) => format!("Opened {}", path.display()),
                 Err(error) => error,
             };
         } else {
-            self.notice = "選択した項目は既に存在しません".to_owned();
+            self.notice = "The selected item no longer exists".to_owned();
         }
         self
     }
@@ -322,7 +322,7 @@ impl ExplorerState {
     pub fn open_selected(self) -> Self {
         if self.selected_key.is_empty() {
             let mut next = self;
-            next.notice = "開く項目を選択してください".to_owned();
+            next.notice = "Select an item to open".to_owned();
             next
         } else {
             let key = self.selected_key.clone();
@@ -334,7 +334,7 @@ impl ExplorerState {
         let canonical = match fs::canonicalize(&path) {
             Ok(path) => user_facing_path(path),
             Err(error) => {
-                self.notice = format!("{} を開けません: {error}", path.display());
+                self.notice = format!("Cannot open {}: {error}", path.display());
                 return;
             }
         };
@@ -348,7 +348,7 @@ impl ExplorerState {
                 self.entries = entries;
                 self.query.clear();
                 self.selected_key.clear();
-                self.notice = "フォルダーを開きました".to_owned();
+                self.notice = "Folder opened".to_owned();
             }
             Err(error) => self.notice = error,
         }
@@ -367,8 +367,8 @@ fn user_facing_path(path: PathBuf) -> PathBuf {
 }
 
 fn read_directory(path: &Path) -> Result<Vec<FileEntry>, String> {
-    let reader = fs::read_dir(path)
-        .map_err(|error| format!("{} を読み取れません: {error}", path.display()))?;
+    let reader =
+        fs::read_dir(path).map_err(|error| format!("Cannot read {}: {error}", path.display()))?;
     let mut entries = Vec::new();
     for item in reader {
         let Ok(item) = item else { continue };
@@ -404,7 +404,7 @@ fn path_key(path: &Path) -> String {
 
 fn file_kind(path: &Path, is_dir: bool) -> String {
     if is_dir {
-        return "ファイル フォルダー".to_owned();
+        return "File folder".to_owned();
     }
     match path
         .extension()
@@ -413,16 +413,16 @@ fn file_kind(path: &Path, is_dir: bool) -> String {
         .to_ascii_lowercase()
         .as_str()
     {
-        "exe" => "アプリケーション",
-        "dll" => "アプリケーション拡張",
-        "rs" => "Rust ソース ファイル",
-        "toml" => "TOML ファイル",
-        "md" => "Markdown ファイル",
-        "txt" => "テキスト ドキュメント",
-        "png" | "jpg" | "jpeg" | "gif" | "webp" => "画像ファイル",
-        "zip" | "7z" | "rar" => "圧縮ファイル",
-        "json" => "JSON ファイル",
-        _ => "ファイル",
+        "exe" => "Application",
+        "dll" => "Application extension",
+        "rs" => "Rust source file",
+        "toml" => "TOML file",
+        "md" => "Markdown file",
+        "txt" => "Text document",
+        "png" | "jpg" | "jpeg" | "gif" | "webp" => "Image file",
+        "zip" | "7z" | "rar" => "Compressed archive",
+        "json" => "JSON file",
+        _ => "File",
     }
     .to_owned()
 }
@@ -542,7 +542,7 @@ fn open_with_shell(path: &Path) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "{} を関連付けられたアプリで開けません",
+            "Cannot open {} with its associated application",
             path.display()
         ))
     }

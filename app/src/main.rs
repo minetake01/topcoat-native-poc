@@ -18,29 +18,29 @@ fn app(cx: &mut RenderCx) -> Element {
             <header class="flex gap-2">
                 <button
                     class="toolbar"
-                    title="戻る"
-                    aria-label="戻る"
+                    title="Back"
+                    aria-label="Back"
                     disabled=(!snapshot.can_back())
                     @click=$(|_event: Event| explorer.set(explorer.get().go_back()))
                 >"←"</button>
                 <button
                     class="toolbar"
-                    title="進む"
-                    aria-label="進む"
+                    title="Forward"
+                    aria-label="Forward"
                     disabled=(!snapshot.can_forward())
                     @click=$(|_event: Event| explorer.set(explorer.get().go_forward()))
                 >"→"</button>
                 <button
                     class="toolbar"
-                    title="上へ"
-                    aria-label="上へ"
+                    title="Up"
+                    aria-label="Up"
                     disabled=(!snapshot.can_up())
                     @click=$(|_event: Event| explorer.set(explorer.get().go_up()))
                 >"↑"</button>
                 <button
                     class="toolbar"
-                    title="最新の情報に更新"
-                    aria-label="最新の情報に更新"
+                    title="Refresh"
+                    aria-label="Refresh"
                     @click=$(|_event: Event| explorer.set(explorer.get().refresh()))
                 >"↻"</button>
 
@@ -63,27 +63,27 @@ fn app(cx: &mut RenderCx) -> Element {
                     class="w-60"
                     :value=$(snapshot.query())
                     placeholder=(snapshot.search_placeholder())
-                    aria-label="現在のフォルダーを検索"
+                    aria-label="Search the current folder"
                     @input=$(|event: Event| explorer.set(explorer.get().with_query(event.target.value)))
                 >
             </header>
 
             <section class="flex gap-1">
-                <button class="toolbar" disabled="true" title="読み取り専用PoCでは無効">"⊕  新規作成"</button>
-                <button class="toolbar" disabled="true" title="読み取り専用PoCでは無効">"✂  切り取り"</button>
-                <button class="toolbar" disabled="true" title="読み取り専用PoCでは無効">"▣  コピー"</button>
-                <button class="toolbar" disabled="true" title="読み取り専用PoCでは無効">"▤  貼り付け"</button>
-                <button class="toolbar" disabled="true" title="読み取り専用PoCでは無効">"✎  名前の変更"</button>
-                <button class="toolbar" disabled="true" title="読み取り専用PoCでは無効">"⌫  削除"</button>
+                <button class="toolbar" disabled="true" title="Unavailable in this read-only PoC">"⊕  New"</button>
+                <button class="toolbar" disabled="true" title="Unavailable in this read-only PoC">"✂  Cut"</button>
+                <button class="toolbar" disabled="true" title="Unavailable in this read-only PoC">"▣  Copy"</button>
+                <button class="toolbar" disabled="true" title="Unavailable in this read-only PoC">"▤  Paste"</button>
+                <button class="toolbar" disabled="true" title="Unavailable in this read-only PoC">"✎  Rename"</button>
+                <button class="toolbar" disabled="true" title="Unavailable in this read-only PoC">"⌫  Delete"</button>
                 <button
                     class="toolbar"
                     disabled=(snapshot.selected_key().is_empty())
-                    title="選択した項目を開く"
+                    title="Open the selected item"
                     @click=$(|_event: Event| explorer.set(explorer.get().open_selected()))
-                >"↗  開く"</button>
-                <button class="toolbar" title="列見出しでも並べ替えできます">"⇅  並べ替え"</button>
-                <button class="toolbar" title="詳細表示">"☷  表示"</button>
-                <button class="toolbar" title="その他">"•••"</button>
+                >"↗  Open"</button>
+                <button class="toolbar" title="You can also sort with the column headers">"⇅  Sort"</button>
+                <button class="toolbar" title="Details view">"☷  View"</button>
+                <button class="toolbar" title="More">"•••"</button>
             </section>
 
             <section class="flex gap-3">

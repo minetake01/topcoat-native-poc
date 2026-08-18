@@ -1,31 +1,31 @@
 # Topcoat Native Explorer
 
-Topcoat の `view!` 記法で設計し、DOM や WebView を使わず、Rust バックエンドとネイティブ WinUI 3 コントロールで動作するファイルエクスプローラー PoC です。
+A file explorer proof of concept designed with Topcoat's `view!` syntax and powered by a Rust backend and native WinUI 3 controls—without a DOM or WebView.
 
-Windows 11の標準ファイルエクスプローラーを基準に、Mica背景、ナビゲーション、コマンドバー、左サイドバー、詳細表示、ステータスバーを再現しています。
+The interface follows the Windows 11 File Explorer layout, including a Mica backdrop, navigation controls, command bar, left sidebar, details view, and status bar. English is the default and only interface language in this PoC.
 
-## 実装済み
+## Implemented
 
-- 実ファイルシステムのフォルダー・ファイル列挙
-- 戻る、進む、上へ、更新
-- クリック可能なパンくずリスト
-- ホーム、既知フォルダー、利用可能ドライブのサイドバー
-- 現在フォルダー内のインクリメンタル検索
-- 名前、更新日時、種類、サイズの4列表
-- フォルダー優先の昇順・降順ソート
-- 単一選択とダブルクリックによるフォルダー移動
-- 選択項目を「開く」ボタンで開く
-- ファイルをWindowsの関連付けアプリで開く
-- ローカル時刻による更新日時表示
-- ファイル種類、サイズ、汎用アイコン表示
-- MicaバックドロップとOSテーマ追従
-- UI Automation名とネイティブListView選択
+- Real file-system directory and file enumeration
+- Back, Forward, Up, and Refresh navigation
+- Clickable breadcrumb navigation
+- Sidebar with Home, known folders, and available drives
+- Incremental search within the current folder
+- Four-column table with Name, Date modified, Type, and Size
+- Folder-first ascending and descending sorting
+- Single selection and double-click folder navigation
+- Open button for the selected item
+- Files opened with their Windows-associated applications
+- Modification timestamps shown in local time
+- File type, size, and generic icon presentation
+- Mica backdrop with OS theme integration
+- UI Automation names and native ListView selection
 
-安全のため、この版は読み取り専用です。新規作成、切り取り、コピー、貼り付け、名前変更、削除は外観のみ再現し、明示的に無効化しています。
+This version is intentionally read-only. New, Cut, Copy, Paste, Rename, and Delete are represented visually but explicitly disabled.
 
-## Topcoatソース
+## Topcoat source
 
-画面全体は [`app/src/main.rs`](app/src/main.rs) のTopcoat構文で記述されています。状態やイベントの書き味は最初のPoCから変えていません。
+The complete interface is declared with Topcoat syntax in [`app/src/main.rs`](app/src/main.rs). Its state and event model retain the original PoC's Topcoat-style authoring experience.
 
 ```rust
 view! { cx =>
@@ -55,74 +55,74 @@ view! { cx =>
 }
 ```
 
-`<table>`は今回追加したネイティブ要素です。`:key`で場所ごとにネイティブListViewを識別し、フォルダー移動時に古い選択を持ち越しません。Topcoat公式parserのASTから、次のWinUI 3ツリーへloweringされます。
+`<table>` is a native element added by this project. Its `:key` identifies the native ListView by location so that a folder change cannot carry an old selection into the new directory. The official Topcoat parser produces an AST that is lowered into this WinUI 3 tree:
 
 ```text
 <table>
   -> StackPanel
-       -> Grid（列見出しボタン）
-       -> ListView（仮想化、選択）
-            -> Grid（各行の4セル）
+       -> Grid (column header buttons)
+       -> ListView (virtualization and selection)
+            -> Grid (four cells per row)
 ```
 
-表の行データはrenderer-neutralな`TableRow`です。DOM用の`table/tr/td`を無理に模倣せず、ネイティブ環境で必要な仮想化・選択・アクセシビリティを保つ境界にしています。
+Table data uses the renderer-neutral `TableRow` type. This establishes a native boundary that preserves virtualization, selection, and accessibility instead of imitating DOM `table`, `tr`, and `td` elements.
 
-## 構成
+## Project structure
 
-| パス | 役割 |
+| Path | Responsibility |
 |---|---|
-| `app/src/main.rs` | Topcoat構文によるExplorer UI |
-| `app/src/explorer.rs` | Rustファイルシステム、履歴、検索、ソート、ShellExecute |
-| `crates/topcoat-native-macro` | Topcoat ASTからWinUI 3へのlowering |
-| `crates/topcoat-native` | signal/event vocabularyとネイティブtable runtime |
+| `app/src/main.rs` | Explorer UI written with Topcoat syntax |
+| `app/src/explorer.rs` | Rust file system, history, search, sorting, and ShellExecute integration |
+| `crates/topcoat-native-macro` | Topcoat AST to WinUI 3 lowering |
+| `crates/topcoat-native` | Signal and event vocabulary plus the native table runtime |
 
-依存する公式実装は再現性のためコミット固定しています。
+Upstream implementations are pinned to commits for reproducibility:
 
 - Topcoat: `a2bd596af2a149f38fcf49570481f356a6cb1069`
 - windows-rs / windows-reactor: `845e42a4328ec5b54b97f965798589d997cad177`
 
-## 実行
+## Run
 
-Windows 10 1809以降またはWindows 11、Rust 1.95以降、Gitが必要です。Micaの本来の外観はWindows 11で表示されます。
+Requirements: Windows 10 version 1809 or later (Windows 11 recommended), Rust 1.95 or later, and Git. The full Mica appearance is available on Windows 11.
 
 ```powershell
 cargo run -p topcoat-native-demo
 ```
 
-直接実行する場合:
+To launch the debug executable directly:
 
 ```powershell
 target\debug\topcoat-native-demo.exe
 ```
 
-起動時は実行ファイル自身が置かれたフォルダーを表示します。
+At startup, the application displays the directory containing its own executable.
 
-## 検証済み
+## Verified
 
 - `cargo check --workspace`
 - `cargo test --workspace`
 - `cargo clippy --workspace -- -D warnings`
 - `cargo fmt --all -- --check`
-- 133項目を含む実フォルダーの表示とスクロール
-- 検索による133件から2件への絞り込み
-- 行選択と「開く」ボタンの有効化
-- ダブルクリックによる子フォルダーへの移動
-- 戻る履歴による元フォルダーへの復帰
-- Mica背景、4列配置、日本語の更新日時表示
+- Display and scrolling of a real directory containing 133 items
+- Search narrowing the list from 133 items to 2
+- Row selection and Open button activation
+- Double-click navigation into a child folder
+- Back navigation to the original folder
+- Mica backdrop, four-column layout, and English modification timestamps
 
-## 現時点の境界
+## Current boundaries
 
-これはOSのシェルそのものを置き換える段階ではなく、Explorer型ネイティブUIとRustバックエンドがTopcoatから成立することを示すPoCです。次は次の機能が必要です。
+This PoC does not replace the operating-system shell. It demonstrates that an Explorer-style native UI and Rust backend can be driven from Topcoat. A production file manager would still need:
 
-1. コピー、移動、削除、名前変更、新規作成と進行状況UI
-2. ごみ箱、Undo、競合確認、権限昇格などの安全なファイル操作モデル
-3. タブ、コンテキストメニュー、プレビュー、サムネイル
-4. `shell:`名前空間、ネットワーク、OneDrive、WSL、ライブラリ統合
-5. Windows Search、変更監視、巨大フォルダーの非同期列挙
-6. Windows標準アイコン、ファイルプロパティ、シェル拡張
+1. Copy, move, delete, rename, create, and progress UI
+2. A safe mutation model covering the Recycle Bin, Undo, conflicts, and elevation
+3. Tabs, context menus, previews, and thumbnails
+4. `shell:` namespaces, networking, OneDrive, WSL, and library integration
+5. Windows Search, change notifications, and asynchronous enumeration of large folders
+6. Windows system icons, file properties, and shell extensions
 
-未対応機能を別のUI経路へ黙ってfallbackする実装はありません。
+Unsupported features do not silently fall back to an alternate UI path.
 
 ## License
 
-このPoCのコードはMIT Licenseです。依存プロジェクトには各プロジェクトのライセンスが適用されます。
+This PoC is licensed under the MIT License. Dependencies remain subject to their respective licenses.
