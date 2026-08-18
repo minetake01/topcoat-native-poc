@@ -222,6 +222,7 @@ fn lower_element_into(
         "h1" | "h2" | "h3" | "p" | "span" | "label" => lower_text_element(element, &name, target),
         "button" => lower_button(element, signals, target),
         "input" => lower_input(element, signals, target),
+        "table" => lower_table(element, signals, target),
         _ => Err(syn::Error::new(
             element.name().span(),
             format!("HTML element `<{name}>` has no WinUI mapping in this PoC"),
@@ -229,11 +230,95 @@ fn lower_element_into(
     }
 }
 
+fn lower_table(
+    element: &Element,
+    signals: &[Ident],
+    target: TokenStream2,
+) -> syn::Result<TokenStream2> {
+    if !element.children().is_empty() {
+        return Err(syn::Error::new(
+            element.name().span(),
+            "native `<table>` receives rows through `:rows` and cannot have children",
+        ));
+    }
+
+    let mut key: Option<&Expr> = None;
+    let mut rows: Option<&Expr> = None;
+    let mut selected: Option<&Expr> = None;
+    let mut width: Option<&Expr> = None;
+    let mut height: Option<&Expr> = None;
+    let mut select: Option<&Expr> = None;
+    let mut activate: Option<&Expr> = None;
+    let mut sort: Option<&Expr> = None;
+
+    for item in &element.attributes().items {
+        match item {
+            AttributeNode::BindAttribute(binding) => match static_key(&binding.key)?.as_str() {
+                "key" => key = Some(binding_value(binding)),
+                "rows" => rows = Some(binding_value(binding)),
+                "selected" => selected = Some(binding_value(binding)),
+                "width" => width = Some(binding_value(binding)),
+                "height" => height = Some(binding_value(binding)),
+                key => return Err(unsupported_attribute(element, &format!(":{key}"))),
+            },
+            AttributeNode::EventHandler(handler) => match static_key(&handler.key)?.as_str() {
+                "select" => select = Some(handler_expr(handler)?),
+                "activate" => activate = Some(handler_expr(handler)?),
+                "sort" => sort = Some(handler_expr(handler)?),
+                key => return Err(unsupported_attribute(element, &format!("@{key}"))),
+            },
+            other => return Err(unsupported_attribute_node(element, other)),
+        }
+    }
+
+    let key = required_table_expr(key, element, ":key")?;
+    let rows = required_table_expr(rows, element, ":rows")?;
+    let selected = required_table_expr(selected, element, ":selected")?;
+    let width = required_table_expr(width, element, ":width")?;
+    let height = required_table_expr(height, element, ":height")?;
+    let select =
+        event_callback_with_value(required_table_expr(select, element, "@select")?, signals)?;
+    let activate = event_callback_with_value(
+        required_table_expr(activate, element, "@activate")?,
+        signals,
+    )?;
+    let sort = event_callback_with_value(required_table_expr(sort, element, "@sort")?, signals)?;
+
+    Ok(quote! {
+        #target.push(::topcoat_native::native_table(
+            ::topcoat_native::NativeTableProps {
+                key: ::std::string::ToString::to_string(&(#key)),
+                rows: #rows,
+                selected_key: ::std::string::ToString::to_string(&(#selected)),
+                width: #width,
+                height: #height,
+            },
+            #select,
+            #activate,
+            #sort,
+        ));
+    })
+}
+
+fn required_table_expr<'a>(
+    value: Option<&'a Expr>,
+    element: &Element,
+    name: &str,
+) -> syn::Result<&'a Expr> {
+    value.ok_or_else(|| {
+        syn::Error::new(
+            element.name().span(),
+            format!("native `<table>` requires `{name}`"),
+        )
+    })
+}
+
 #[derive(Default)]
 struct LayoutClasses {
     horizontal: bool,
     spacing: Option<f64>,
     padding: Option<f64>,
+    width: Option<f64>,
 }
 
 fn lower_container(
@@ -263,16 +348,20 @@ fn lower_container(
     let padding = classes
         .padding
         .map(|value| quote!(let __topcoat_widget = __topcoat_widget.padding(#value);));
+    let width = classes
+        .width
+        .map(|value| quote!(let __topcoat_widget = __topcoat_widget.width(#value);));
 
     Ok(quote! {
         {
-            use ::topcoat_native::windows_reactor::PaddingExt as _;
+            use ::topcoat_native::windows_reactor::{LayoutExt as _, PaddingExt as _};
             let mut #child_ident: ::std::vec::Vec<
                 ::topcoat_native::windows_reactor::Element
             > = ::std::vec::Vec::new();
             #children
             let __topcoat_widget = #constructor.spacing(#spacing);
             #padding
+            #width
             #target.push(__topcoat_widget.into());
         }
     })
@@ -364,6 +453,7 @@ fn lower_button(
     }
 
     let mut style = TokenStream2::new();
+    let mut width = None;
     if let Some(class) = attrs.class.as_deref() {
         for token in class.split_whitespace() {
             match token {
@@ -373,6 +463,12 @@ fn lower_button(
                 "secondary" | "btn-secondary" => style.extend(quote! {
                     let __topcoat_widget = __topcoat_widget.subtle();
                 }),
+                "nav" | "toolbar" => style.extend(quote! {
+                    let __topcoat_widget = __topcoat_widget.subtle();
+                }),
+                value if value.starts_with("w-") => {
+                    width = Some(tailwind_spacing(value, "w-")?);
+                }
                 _ => {
                     return Err(syn::Error::new(
                         element.name().span(),
@@ -388,6 +484,11 @@ fn lower_button(
             let __topcoat_widget = __topcoat_widget.enabled(!(#value));
         }
     });
+    let width = width.map(|value| {
+        quote! {
+            let __topcoat_widget = __topcoat_widget.width(#value);
+        }
+    });
     let click = click
         .map(|expr| event_callback(expr, signals, quote!(::topcoat_native::Event::click())))
         .transpose()?
@@ -400,9 +501,10 @@ fn lower_button(
 
     Ok(quote! {
         {
-            use ::topcoat_native::windows_reactor::{AccessibilityExt as _, TooltipExt as _};
+            use ::topcoat_native::windows_reactor::{AccessibilityExt as _, LayoutExt as _, TooltipExt as _};
             let __topcoat_widget = ::topcoat_native::windows_reactor::button(#text);
             #style
+            #width
             #disabled
             #click
             #modifiers
@@ -454,13 +556,21 @@ fn lower_input(
         }
     }
 
-    if let Some(class) = attrs.class.as_deref()
-        && !class.trim().is_empty()
-    {
-        return Err(syn::Error::new(
-            element.name().span(),
-            "input classes are not mapped in this PoC",
-        ));
+    let mut width = None;
+    if let Some(class) = attrs.class.as_deref() {
+        for token in class.split_whitespace() {
+            match token {
+                value if value.starts_with("w-") => {
+                    width = Some(tailwind_spacing(value, "w-")?);
+                }
+                _ => {
+                    return Err(syn::Error::new(
+                        element.name().span(),
+                        format!("input class `{token}` has no native mapping"),
+                    ));
+                }
+            }
+        }
     }
 
     let placeholder = placeholder.map(|value| {
@@ -471,6 +581,11 @@ fn lower_input(
     let disabled = disabled.map(|value| {
         quote! {
             let __topcoat_widget = __topcoat_widget.enabled(!(#value));
+        }
+    });
+    let width = width.map(|value| {
+        quote! {
+            let __topcoat_widget = __topcoat_widget.width(#value);
         }
     });
     let on_input = input_handler
@@ -486,10 +601,11 @@ fn lower_input(
 
     Ok(quote! {
         {
-            use ::topcoat_native::windows_reactor::{AccessibilityExt as _, TooltipExt as _};
+            use ::topcoat_native::windows_reactor::{AccessibilityExt as _, LayoutExt as _, TooltipExt as _};
             let __topcoat_widget = ::topcoat_native::windows_reactor::text_box(#value);
             #placeholder
             #disabled
+            #width
             #on_input
             #modifiers
             #target.push(__topcoat_widget.into());
@@ -619,6 +735,9 @@ fn parse_layout_attributes(element: &Element) -> syn::Result<LayoutClasses> {
             }
             value if value.starts_with("p-") => {
                 layout.padding = Some(tailwind_spacing(value, "p-")?);
+            }
+            value if value.starts_with("w-") => {
+                layout.width = Some(tailwind_spacing(value, "w-")?);
             }
             _ => {
                 return Err(syn::Error::new(

@@ -1,108 +1,128 @@
-# Topcoat Native WinUI 3 PoC
+# Topcoat Native Explorer
 
-Topcoat の `view!` 記法を維持しつつ、DOM の代わりに本物の WinUI 3 コントロールを生成する最小実証です。アプリ、状態管理、イベント処理は Rust で動作し、WebView は使いません。
+Topcoat の `view!` 記法で設計し、DOM や WebView を使わず、Rust バックエンドとネイティブ WinUI 3 コントロールで動作するファイルエクスプローラー PoC です。
 
-## 実証したこと
+Windows 11の標準ファイルエクスプローラーを基準に、Mica背景、ナビゲーション、コマンドバー、左サイドバー、詳細表示、ステータスバーを再現しています。
 
-- Topcoat 公式の `topcoat-view-grammar` で既存の `view! { cx => ... }` 構文を解析する
-- `signal`、Rust 式、`if`、`for`、`let` をそのまま Rust のリアクティブ描画へ lowering する
-- HTML 風の要素を WinUI 3 の `StackPanel`、`TextBlock`、`TextBox`、`Button` に変換する
-- `@click` と `@input` をネイティブイベントへ接続し、signal 更新時に UI を再調停する
-- WinUI 3 の `MicaBackdrop` をウィンドウ背景へ適用する
-- 未対応の DOM/CSS 機能は黙って近似せず、コンパイル時にエラーにする
+## 実装済み
 
-動作例は [`app/src/main.rs`](app/src/main.rs) です。UI のソースは次のように Topcoat の形を保っています。
+- 実ファイルシステムのフォルダー・ファイル列挙
+- 戻る、進む、上へ、更新
+- クリック可能なパンくずリスト
+- ホーム、既知フォルダー、利用可能ドライブのサイドバー
+- 現在フォルダー内のインクリメンタル検索
+- 名前、更新日時、種類、サイズの4列表
+- フォルダー優先の昇順・降順ソート
+- 単一選択とダブルクリックによるフォルダー移動
+- 選択項目を「開く」ボタンで開く
+- ファイルをWindowsの関連付けアプリで開く
+- ローカル時刻による更新日時表示
+- ファイル種類、サイズ、汎用アイコン表示
+- MicaバックドロップとOSテーマ追従
+- UI Automation名とネイティブListView選択
+
+安全のため、この版は読み取り専用です。新規作成、切り取り、コピー、貼り付け、名前変更、削除は外観のみ再現し、明示的に無効化しています。
+
+## Topcoatソース
+
+画面全体は [`app/src/main.rs`](app/src/main.rs) のTopcoat構文で記述されています。状態やイベントの書き味は最初のPoCから変えていません。
 
 ```rust
 view! { cx =>
-    signal count = 0_i32;
-    signal name = String::from("Topcoat");
+    signal explorer = ExplorerState::initial();
+    let snapshot = explorer.get();
 
-    <main class="p-6 space-y-4">
+    <main class="p-3 space-y-2">
         <input
             type="text"
-            :value=$(name.get())
-            @input=$(|event: Event| name.set(event.target.value))
+            :value=$(snapshot.query())
+            @input=$(|event: Event| {
+                explorer.set(explorer.get().with_query(event.target.value))
+            })
         >
-        <p>(format!("Hello, {}. Count: {}", name.get(), count.get()))</p>
-        <button @click=$(|_event: Event| count.set(count.get() + 1))>
-            "Increment"
-        </button>
+
+        <table
+            :key=$(snapshot.current_display())
+            :rows=$(snapshot.rows())
+            :selected=$(snapshot.selected_key())
+            :width=$(table_width)
+            :height=$(table_height)
+            @select=$(|event: Event| explorer.set(explorer.get().select(event.target.value)))
+            @activate=$(|event: Event| explorer.set(explorer.get().activate(event.target.value)))
+            @sort=$(|event: Event| explorer.set(explorer.get().sort_by(event.target.value)))
+        ></table>
     </main>
 }
 ```
 
-## 設計
+`<table>`は今回追加したネイティブ要素です。`:key`で場所ごとにネイティブListViewを識別し、フォルダー移動時に古い選択を持ち越しません。Topcoat公式parserのASTから、次のWinUI 3ツリーへloweringされます。
 
 ```text
-Topcoat view! source
-        |
-        v
-topcoat-view-grammar (upstream parser, pinned commit)
-        |
-        v
-topcoat-native-macro (WinUI lowering, this PoC)
-        |
-        v
-windows-reactor + Windows App SDK / WinUI 3
-        |
-        v
-native Windows controls
+<table>
+  -> StackPanel
+       -> Grid（列見出しボタン）
+       -> ListView（仮想化、選択）
+            -> Grid（各行の4セル）
 ```
 
-Topcoat の合意形成で得られた表面言語を fork して再発明せず、公式 parser の公開 AST をレンダラー境界として利用しています。独自部分は AST から WinUI 3 への変換だけです。
+表の行データはrenderer-neutralな`TableRow`です。DOM用の`table/tr/td`を無理に模倣せず、ネイティブ環境で必要な仮想化・選択・アクセシビリティを保つ境界にしています。
 
-依存リビジョンは再現性のため固定しています。
+## 構成
+
+| パス | 役割 |
+|---|---|
+| `app/src/main.rs` | Topcoat構文によるExplorer UI |
+| `app/src/explorer.rs` | Rustファイルシステム、履歴、検索、ソート、ShellExecute |
+| `crates/topcoat-native-macro` | Topcoat ASTからWinUI 3へのlowering |
+| `crates/topcoat-native` | signal/event vocabularyとネイティブtable runtime |
+
+依存する公式実装は再現性のためコミット固定しています。
 
 - Topcoat: `a2bd596af2a149f38fcf49570481f356a6cb1069`
 - windows-rs / windows-reactor: `845e42a4328ec5b54b97f965798589d997cad177`
 
-## 対応表
-
-| Topcoat 側 | WinUI 3 側 |
-|---|---|
-| `signal` | `windows_reactor::SetState<T>` |
-| `main`, `div` | `StackPanel` |
-| `h1`, `h2`, `h3`, `p`, `span`, `label` | `TextBlock` |
-| `input type="text"` | `TextBox` |
-| `button` | `Button` |
-| `@click` | `Button::click` callback |
-| `@input`, `@change` | `TextBox::text_changed` callback |
-| `if`, `for`, `let`, Rust 式 | Rust の制御フローと式 |
-| `id`, `aria-label`, `title` | Automation ID、Automation Name、ToolTip |
-| `flex`, `flex-row`, `flex-col`, `gap-N`, `space-x-N`, `space-y-N`, `p-N` | `StackPanel` の向き、間隔、padding |
-
 ## 実行
 
-必要なものは Windows 10 1809 以降または Windows 11、Rust 1.95 以降、Git、ネットワーク接続です。初回ビルドでは固定リビジョンの Git 依存を取得します。
+Windows 10 1809以降またはWindows 11、Rust 1.95以降、Gitが必要です。Micaの本来の外観はWindows 11で表示されます。
 
 ```powershell
 cargo run -p topcoat-native-demo
 ```
 
-ウィンドウ背景には `Backdrop::Mica` を指定しています。Mica を隠さないよう、Topcoat から生成するルートパネルには不透明な背景を設定していません。Windows 11 では壁紙色を取り込んだ Windows 設定に近い外観になり、OS の視覚効果・アクセシビリティ方針に応じた表示制御は WinUI 3 が担当します。
+直接実行する場合:
 
-確認済みの操作:
+```powershell
+target\debug\topcoat-native-demo.exe
+```
 
-1. `Increment` で `Count: 0` から更新される
-2. 3 回目で Rust の `if` による条件テキストが現れる
-3. 名前欄を変更すると `Hello, ...` が即時更新される
-4. `Reset` でカウントと条件表示が戻る
+起動時は実行ファイル自身が置かれたフォルダーを表示します。
 
-## PoC の境界
+## 検証済み
 
-対応していないものは、Topcoat component 呼び出し、動的タグ/属性名、raw JavaScript handler、任意 CSS、DOM API、`match`、DOCTYPE です。これらを WebView や隠れた fallback に流す経路はありません。使用すると proc macro がコンパイルエラーを返します。
+- `cargo check --workspace`
+- `cargo test --workspace`
+- `cargo clippy --workspace -- -D warnings`
+- `cargo fmt --all -- --check`
+- 133項目を含む実フォルダーの表示とスクロール
+- 検索による133件から2件への絞り込み
+- 行選択と「開く」ボタンの有効化
+- ダブルクリックによる子フォルダーへの移動
+- 戻る履歴による元フォルダーへの復帰
+- Mica背景、4列配置、日本語の更新日時表示
 
-本格実装に進む場合は、次の順序が自然です。
+## 現時点の境界
 
-1. Topcoat AST と各ネイティブ renderer の間に、renderer-neutral な UI HIR を定義する
-2. component、keyed list、focus、validation、accessibility の意味論を固定する
-3. WinUI 3 renderer の control/property/event 対応を拡張する
-4. 同じ HIR に SwiftUI と Jetpack Compose renderer を追加する
-5. compile-fail test とネイティブ UI 自動テストを整備する
+これはOSのシェルそのものを置き換える段階ではなく、Explorer型ネイティブUIとRustバックエンドがTopcoatから成立することを示すPoCです。次は次の機能が必要です。
 
-これは Topcoat 本体の fork ではなく、レンダラー交換が成立するかを確かめる独立 PoC です。
+1. コピー、移動、削除、名前変更、新規作成と進行状況UI
+2. ごみ箱、Undo、競合確認、権限昇格などの安全なファイル操作モデル
+3. タブ、コンテキストメニュー、プレビュー、サムネイル
+4. `shell:`名前空間、ネットワーク、OneDrive、WSL、ライブラリ統合
+5. Windows Search、変更監視、巨大フォルダーの非同期列挙
+6. Windows標準アイコン、ファイルプロパティ、シェル拡張
+
+未対応機能を別のUI経路へ黙ってfallbackする実装はありません。
 
 ## License
 
-この PoC 固有のコードは [CC0 1.0 Universal](LICENSE) で提供します。依存プロジェクトには各プロジェクトのライセンスが適用されます。
+このPoCのコードはMIT Licenseです。依存プロジェクトには各プロジェクトのライセンスが適用されます。
