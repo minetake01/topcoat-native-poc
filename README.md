@@ -105,4 +105,4 @@ cargo run -p topcoat-native-demo
 
 ## License
 
-この PoC のコードは MIT License です。依存プロジェクトには各プロジェクトのライセンスが適用されます。
+この PoC 固有のコードは [CC0 1.0 Universal](LICENSE) で提供します。依存プロジェクトには各プロジェクトのライセンスが適用されます。
